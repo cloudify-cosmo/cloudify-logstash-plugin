@@ -38,32 +38,32 @@ def install(logstash_config, **kwargs):
     java_path - the path java can be found in.
     logstash_url - the url from which to download the logstash package file
     """
-    utils.check_java_exists(logstash_config.get('java_path', 'java'))
+    utils.verify_java_is_executable(logstash_config.get('java_path', 'java'))
     pkg_url = logstash_config.get('logstash_url', DEFAULT_LOGSTASH_URL)
     pkg_file_name = pkg_url.split('/')[-1]
     pkg_file_path = os.path.join(DEFAULT_PATH, pkg_file_name)
     pkg_ext = os.path.splitext(pkg_file_name)
     utils.download_file(pkg_url, pkg_file_path)
     if pkg_ext == 'tar.gz':
-        _install_from_tar(logstash_config)
+        _install_from_tar(pkg_file_path, logstash_config)
     elif pkg_ext in ('rpm', 'deb'):
         _install_from_package(pkg_file_path)
 
 
-def _install_from_tar():
-    # tar_url = logstash_config.get('logstash_url', DEFAULT_LOGSTASH_URL)
-    # tar_path = DEFAULT_TAR_DESTINATION_PATH
-    # destination = tar if tar else url.split('/')[-1]
-    # utils.untar(tar_path, logstash_config.get('logstash_path', DEFAULT_PATH))
+def _install_from_tar(path, logstash_config):
+    """installs logstash from a tar.gz file"""
+    # utils.untar(path, logstash_config.get('logstash_path', DEFAULT_PATH))
     raise NotImplementedError()
 
 
 def _install_from_package(path):
+    """installs logstash from a deb/rpm package"""
     utils.install_package(path)
 
 
 @operation
 def configure(logstash_config, **kwargs):
+    """configures logstash by retrieving its config file"""
     conf_src = logstash_config.get('conf_source')
     if not conf_src:
         raise exceptions.NonRecoverableError(
@@ -78,6 +78,7 @@ def configure(logstash_config, **kwargs):
 
 @operation
 def start(logstash_config, **kwargs):
+    """starts the process"""
     logstash_path = logstash_config.get('logstash_path', DEFAULT_PATH)
     conf_dst = logstash_config.get(
         'conf_destination', DEFAULT_CONFIG_DESTINATION_PATH)

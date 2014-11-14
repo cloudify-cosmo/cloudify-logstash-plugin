@@ -9,17 +9,27 @@ from cloudify import exceptions
 
 
 def get_distro():
-    return platform.dist()[0]
+    ctx.logger.debug('identifying distribution...')
+    distro = platform.dist()[0]
+    ctx.logger.debug('distro identified: {0}'.format(distro))
 
 
 def install_package(path, distro=get_distro()):
+    """installs an rpm/deb package
 
+    Distribution identification will happen automatically.
+    If the distribution is not supported, or the package
+    extension does not fit the identified distribution,
+    an exception will be raised.
+    """
     def raise_package_type_error(distro, pkg_type):
         raise exceptions.NonRecoverableError(
             'package type for distro {0} must be of type {1}'.format(
                 distro, pkg_type))
 
+    ctx.logger.debug('attemping to install {0}'.format(path))
     ext = os.path.splitext(path)
+    ctx.logger.debug('package extention is: {0}'.format(ext))
     if distro.lower() in ('ubuntu', 'debian'):
         if ext == 'deb':
             return sudo('dpkg -i {0}'.format(path))
@@ -36,6 +46,7 @@ def install_package(path, distro=get_distro()):
 
 
 def check_resource_available(resource):
+    ctx.logger.debug('verifying that {0} is available'.format(resource))
     response = requests.head(resource)
     if response.status_code != requests.codes.ok:
         raise exceptions.NonRecoverableError(
@@ -54,7 +65,7 @@ def untar(source, destination):
         source, destination))
 
 
-def run(ctx, cmd):
+def run(cmd):
     """executes a command
 
     :param string cmd: command to execute
@@ -86,10 +97,9 @@ def mkdir(path):
         ctx.logger.debug('directory already exists: {0}'.format(path))
 
 
-def check_java_exists(java_path):
-    ctx.logger.debug('checking to see if java is runnable.')
-    java_nexists = os.system('{0} -version'.format(java_path))
-    if java_nexists:
+def verify_java_is_executable(java_path):
+    ctx.logger.debug('verifying that {0} is executable.'.format(java_path))
+    if os.system('{0} -version'.format(java_path)):
         raise exceptions.NonRecoverableError('{0} is not executable'.format(
             java_path))
 
