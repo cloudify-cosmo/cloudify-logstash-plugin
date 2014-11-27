@@ -25,7 +25,11 @@ import utils
 DEFAULT_PATH = os.path.expanduser('~/logstash')
 DEFAULT_CONFIG_DESTINATION_PATH = os.path.join(DEFAULT_PATH, 'logstash.conf')
 DEFAULT_TAR_DESTINATION_PATH = os.path.join(DEFAULT_PATH, 'logstash.tar.gz')
-DEFAULT_LOGSTASH_URL = 'https://download.elasticsearch.org/logstash/logstash/logstash-1.4.2.tar.gz'  # NOQA
+DEFAULT_PACKAGES = {
+    'tar': 'https://download.elasticsearch.org/logstash/logstash/logstash-1.4.2.tar.gz',  # NOQA
+    'rpm': 'https://download.elasticsearch.org/logstash/logstash/packages/centos/logstash-1.4.2-1_2c0f5a1.noarch.rpm',  # NOQA
+    'deb': 'https://download.elasticsearch.org/logstash/logstash/packages/debian/logstash_1.4.2-1-2c0f5a1_all.deb',  # NOQA
+}
 
 
 @operation
@@ -38,16 +42,19 @@ def install(logstash_config, **kwargs):
     java_path - the path java can be found in.
     logstash_url - the url from which to download the logstash package file
     """
-    utils.verify_java_is_executable(logstash_config.get('java_path', 'java'))
-    pkg_url = logstash_config.get('logstash_url', DEFAULT_LOGSTASH_URL)
+    utils.verify_is_executable(
+        logstash_config.get('java_path', 'java') + ' -version')
+    pkg_url = logstash_config.get(
+        'logstash_url', DEFAULT_PACKAGES[utils.get_package_type_for_distro()])
     pkg_file_name = pkg_url.split('/')[-1]
     pkg_file_path = os.path.join(DEFAULT_PATH, pkg_file_name)
     pkg_ext = os.path.splitext(pkg_file_name)
     utils.download_file(pkg_url, pkg_file_path)
-    if pkg_ext == 'tar.gz':
-        _install_from_tar(pkg_file_path, logstash_config)
-    elif pkg_ext in ('rpm', 'deb'):
+    if pkg_ext in ('rpm', 'deb'):
         _install_from_package(pkg_file_path)
+    elif pkg_ext == 'tar.gz':
+        _install_from_tar(pkg_file_path, logstash_config)
+    os.remove(pkg_file_path)
 
 
 def _install_from_tar(path, logstash_config):
@@ -64,14 +71,13 @@ def _install_from_package(path):
 @operation
 def configure(logstash_config, **kwargs):
     """configures logstash by retrieving its config file"""
-    conf_src = logstash_config.get('conf_source')
+    conf_src = logstash_config.get('config_source')
     if not conf_src:
         raise exceptions.NonRecoverableError(
             'logstash config file not supplied.')
 
-    # TODO: make this configurable
     conf_dst = logstash_config.get(
-        'conf_destination', DEFAULT_CONFIG_DESTINATION_PATH)
+        'config_destination', DEFAULT_CONFIG_DESTINATION_PATH)
     utils.mkdir(conf_dst)
     ctx.download_resource(conf_src, conf_dst)
 
@@ -79,11 +85,12 @@ def configure(logstash_config, **kwargs):
 @operation
 def start(logstash_config, **kwargs):
     """starts the process"""
-    logstash_path = logstash_config.get('logstash_path', DEFAULT_PATH)
-    conf_dst = logstash_config.get(
-        'conf_destination', DEFAULT_CONFIG_DESTINATION_PATH)
-    if logstash_config('java_path'):
-        os.environ['JAVA_HOME'] = logstash_config['java_path']
-    logstash_binary = os.path.join(logstash_path, 'bin/logstash')
-    cmd = 'nohup ' + logstash_binary + ' -f ' + conf_dst
-    utils._run(cmd)
+    utils.sudo('service logstash start')
+    # logstash_path = logstash_config.get('logstash_path', DEFAULT_PATH)
+    # conf_dst = logstash_config.get(
+    #     'conf_destination', DEFAULT_CONFIG_DESTINATION_PATH)
+    # if logstash_config('java_path'):
+    #     os.environ['JAVA_HOME'] = logstash_config['java_path']
+    # logstash_binary = os.path.join(logstash_path, 'bin/logstash')
+    # cmd = 'nohup ' + logstash_binary + ' -f ' + conf_dst
+    # utils._run(cmd)

@@ -14,6 +14,16 @@ def get_distro():
     ctx.logger.debug('distro identified: {0}'.format(distro))
 
 
+def get_package_type_for_distro(distro=get_distro()):
+    ctx.logger.debug('identifying package type for distro')
+    if distro.lower() in ('ubuntu', 'debian'):
+        return 'deb'
+    elif distro.lower() in ('centos', 'redhat', 'fedora'):
+        return 'rpm'
+    else:
+        return None
+
+
 def install_package(path, distro=get_distro()):
     """installs an rpm/deb package
 
@@ -22,27 +32,22 @@ def install_package(path, distro=get_distro()):
     extension does not fit the identified distribution,
     an exception will be raised.
     """
-    def raise_package_type_error(distro, pkg_type):
-        raise exceptions.NonRecoverableError(
-            'package type for distro {0} must be of type {1}'.format(
-                distro, pkg_type))
-
     ctx.logger.debug('attemping to install {0}'.format(path))
     ext = os.path.splitext(path)
     ctx.logger.debug('package extention is: {0}'.format(ext))
-    if distro.lower() in ('ubuntu', 'debian'):
-        if ext == 'deb':
-            return sudo('dpkg -i {0}'.format(path))
-        else:
-            raise_package_type_error(distro, 'deb')
-    elif distro.lower() in ('redhat', 'centos', 'fedora'):
-        if ext == 'rpm':
-            return sudo('rpm -ivh {0}'.format(path))
-        else:
-            raise_package_type_error(distro, 'rpm')
-    else:
+    package_type = get_package_type_for_distro(distro)
+    # check which package type we're expecting
+    if not package_type:
         raise exceptions.NonRecoverableError(
             'unsupported distribution: {0}'.format(distro))
+    if not ext == package_type:
+        raise exceptions.NonRecoverableError(
+            'package type for distro {0} cannot be of type {1}'.format(
+                distro, ext))
+    elif ext == 'deb':
+        return sudo('dpkg -i {0}'.format(path))
+    elif ext == 'rpm':
+        return sudo('rpm -ivh {0}'.format(path))
 
 
 def check_resource_available(resource):
@@ -97,11 +102,11 @@ def mkdir(path):
         ctx.logger.debug('directory already exists: {0}'.format(path))
 
 
-def verify_java_is_executable(java_path):
-    ctx.logger.debug('verifying that {0} is executable.'.format(java_path))
-    if os.system('{0} -version'.format(java_path)):
+def verify_is_executable(execute):
+    ctx.logger.debug('verifying that {0} is executable.'.format(execute))
+    if os.system('{0}'.format(execute)):
         raise exceptions.NonRecoverableError('{0} is not executable'.format(
-            java_path))
+            execute))
 
 
 def download_file(url, destination):
