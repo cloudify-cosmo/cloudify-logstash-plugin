@@ -16,9 +16,9 @@ def get_distro():
 
 def get_package_type_for_distro(distro=get_distro()):
     ctx.logger.debug('identifying package type for distro')
-    if distro.lower() in ('ubuntu', 'debian'):
+    if distro.lower() in ['ubuntu', 'debian']:
         return 'deb'
-    elif distro.lower() in ('centos', 'redhat', 'fedora'):
+    elif distro.lower() in ['centos', 'redhat', 'fedora']:
         return 'rpm'
     else:
         return None
@@ -109,14 +109,21 @@ def verify_is_executable(execute):
             execute))
 
 
-def download_file(url, destination):
+def download_resource(url, destination):
     ctx.logger.debug('downloading {0} to {1}...'.format(url, destination))
-    r = requests.get(url, stream=True)
-    if not r.status_code == 200:
-        raise exceptions.NonRecoverableError(
-            'failed to download file: {0}'.format(url))
-    with open(destination, 'wb') as f:
-        for chunk in r.iter_content(chunk_size=1024):
-            if chunk:  # filter out keep-alive new chunks
-                f.write(chunk)
-                f.flush()
+    split = url.split('://')
+    schema = split[0]
+    if schema in ['http', 'https']:
+        response = requests.get(url, stream=True)
+        if not response.status_code == 200:
+            raise exceptions.NonRecoverableError(
+                'Failed downloading resource: {0}'
+                ' (''status code: {1})'.format(url, response.status_code))
+        with open(destination, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=1024):
+                if chunk:  # filter out keep-alive new chunks
+                    f.write(chunk)
+                    f.flush()
+        return destination
+    else:
+        return ctx.download_resource(url)

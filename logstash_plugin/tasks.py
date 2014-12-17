@@ -15,12 +15,12 @@
 
 
 import os
-import exceptions
 
+import utils
 from cloudify import ctx
 from cloudify.decorators import operation
-import utils
-# from cloudify import exceptions
+from jingen import Jingen
+
 
 DEFAULT_PATH = os.path.expanduser('~/logstash')
 DEFAULT_CONFIG_DESTINATION_PATH = os.path.join(DEFAULT_PATH, 'logstash.conf')
@@ -33,57 +33,63 @@ DEFAULT_PACKAGES = {
 
 
 @operation
-def install(logstash_config, **kwargs):
+def install(java_path='java', package_source=None, **kwargs):
     """installs logstash
 
     This will check whether java is executable and then install logstash
 
     Properties:
     java_path - the path java can be found in.
-    logstash_url - the url from which to download the logstash package file
+    logstash_source - the url from which to download the logstash package file
     """
-    utils.verify_is_executable(
-        logstash_config.get('java_path', 'java') + ' -version')
-    pkg_url = logstash_config.get(
-        'logstash_url', DEFAULT_PACKAGES[utils.get_package_type_for_distro()])
+    def install_from_tar():
+        """installs logstash from a tar.gz file"""
+        raise NotImplementedError()
+
+    def install_from_package(path):
+        """installs logstash from a deb/rpm package"""
+        utils.install_package(path)
+
+    utils.verify_is_executable(java_path + ' -version')
+    pkg_url = package_source if package_source \
+        else DEFAULT_PACKAGES[utils.get_package_type_for_distro()]
     pkg_file_name = pkg_url.split('/')[-1]
     pkg_file_path = os.path.join(DEFAULT_PATH, pkg_file_name)
     pkg_ext = os.path.splitext(pkg_file_name)
-    utils.download_file(pkg_url, pkg_file_path)
+    utils.download_resource(pkg_url, pkg_file_path)
     if pkg_ext in ('rpm', 'deb'):
-        _install_from_package(pkg_file_path)
+        install_from_package(pkg_file_path)
     elif pkg_ext == 'tar.gz':
-        _install_from_tar(pkg_file_path, logstash_config)
+        install_from_tar()
     os.remove(pkg_file_path)
 
 
-def _install_from_tar(path, logstash_config):
-    """installs logstash from a tar.gz file"""
-    # utils.untar(path, logstash_config.get('logstash_path', DEFAULT_PATH))
-    raise NotImplementedError()
-
-
-def _install_from_package(path):
-    """installs logstash from a deb/rpm package"""
-    utils.install_package(path)
+def apply_rabbit_broker(file_path):
+    vars = {"MGMT_IP": ctx.get_management_ip()}
+    jingen = Jingen(
+        template_file=file_path,
+        vars_source=vars,
+        output_file=file_path,
+        template_dir=os.path.dirname(file_path),
+        make_file=True)
+    try:
+        jingen.generate()
+    except:
+        ctx.logger.info(
+            'template could not be generated. Assuming no template.')
 
 
 @operation
-def configure(logstash_config, **kwargs):
+def configure(config_source,
+              config_destination=DEFAULT_CONFIG_DESTINATION_PATH, **kwargs):
     """configures logstash by retrieving its config file"""
-    conf_src = logstash_config.get('config_source')
-    if not conf_src:
-        raise exceptions.NonRecoverableError(
-            'logstash config file not supplied.')
-
-    conf_dst = logstash_config.get(
-        'config_destination', DEFAULT_CONFIG_DESTINATION_PATH)
-    utils.mkdir(conf_dst)
-    ctx.download_resource(conf_src, conf_dst)
+    utils.mkdir(os.path.dirname(config_destination))
+    utils.download_resource(config_source, config_destination)
+    apply_rabbit_broker(config_destination)
 
 
 @operation
-def start(logstash_config, **kwargs):
+def start(**kwargs):
     """starts the process"""
     utils.sudo('service logstash start')
     # logstash_path = logstash_config.get('logstash_path', DEFAULT_PATH)
@@ -94,3 +100,9 @@ def start(logstash_config, **kwargs):
     # logstash_binary = os.path.join(logstash_path, 'bin/logstash')
     # cmd = 'nohup ' + logstash_binary + ' -f ' + conf_dst
     # utils._run(cmd)
+
+
+@operation
+def stop(**kwargs):
+    """stops the process"""
+    utils.sudo('service logstash stop')
