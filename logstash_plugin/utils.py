@@ -24,7 +24,7 @@ def get_package_type_for_distro(distro=get_distro()):
         return None
 
 
-def install_package(path, distro=get_distro()):
+def install_package(path, ext, distro=get_distro()):
     """installs an rpm/deb package
 
     Distribution identification will happen automatically.
@@ -32,17 +32,16 @@ def install_package(path, distro=get_distro()):
     extension does not fit the identified distribution,
     an exception will be raised.
     """
-    ctx.logger.debug('attemping to install {0}'.format(path))
-    ext = os.path.splitext(path)
-    ctx.logger.debug('package extention is: {0}'.format(ext))
+    ctx.logger.info('Attemping to install {0}'.format(path))
+    ctx.logger.debug('Package extention is: {0}'.format(ext))
     package_type = get_package_type_for_distro(distro)
     # check which package type we're expecting
     if not package_type:
         raise exceptions.NonRecoverableError(
-            'unsupported distribution: {0}'.format(distro))
+            'Unsupported distribution: {0}'.format(distro))
     if not ext == package_type:
         raise exceptions.NonRecoverableError(
-            'package type for distro {0} cannot be of type {1}'.format(
+            'Package type for distro {0} cannot be of type {1}'.format(
                 distro, ext))
     elif ext == 'deb':
         return sudo('dpkg -i {0}'.format(path))
@@ -91,22 +90,22 @@ def sudo(cmd):
 
 def mkdir(path):
     if not os.path.isdir(os.path.dirname(path)):
-        ctx.logger.debug('creating directory: {0}'.format(path))
+        ctx.logger.debug('Creating directory: {0}'.format(path))
         try:
             os.makedirs(os.path.dirname(path))
         except Exception as ex:
             raise exceptions.NonRecoverableError(
-                'failed to create directory: {0}. ({1})'.format(
+                'Failed to create directory: {0}. ({1})'.format(
                     path, ex.message))
     else:
-        ctx.logger.debug('directory already exists: {0}'.format(path))
+        ctx.logger.debug('Directory already exists: {0}'.format(path))
 
 
 def verify_is_executable(execute):
-    ctx.logger.debug('verifying that {0} is executable.'.format(execute))
+    ctx.logger.debug('Verifying that {0} is executable.'.format(execute))
     if os.system('{0}'.format(execute)):
-        raise exceptions.NonRecoverableError('{0} is not executable'.format(
-            execute))
+        return False
+    return True
 
 
 def download_resource(url, destination):
@@ -127,3 +126,9 @@ def download_resource(url, destination):
         return destination
     else:
         return ctx.download_resource(url)
+
+
+# def download_resource(url, destination):
+#     prn('Downloading {0} to {1}'.format(url, destination))
+#     f = urllib.URLopener()
+#     f.retrieve(url, destination)

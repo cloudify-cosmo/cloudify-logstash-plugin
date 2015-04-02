@@ -20,6 +20,7 @@ import utils
 from cloudify import ctx
 from cloudify.decorators import operation
 from jingen import Jingen
+from cloudify import exceptions
 
 
 DEFAULT_PATH = os.path.expanduser('~/logstash')
@@ -33,7 +34,7 @@ DEFAULT_PACKAGES = {
 
 
 @operation
-def install(java_path='java', package_source=None, **kwargs):
+def install(java_path='java', package_source=None, **_):
     """installs logstash
 
     This will check whether java is executable and then install logstash
@@ -50,18 +51,26 @@ def install(java_path='java', package_source=None, **kwargs):
         """installs logstash from a deb/rpm package"""
         utils.install_package(path)
 
-    utils.verify_is_executable(java_path + ' -version')
+    if not utils.verify_is_executable(java_path + ' -version'):
+        # a better exception message.
+        raise exceptions.NonRecoverableError('{0} is not executable.'.format(
+            java_path))
     pkg_url = package_source if package_source \
         else DEFAULT_PACKAGES[utils.get_package_type_for_distro()]
+    # pkg_url = https://logstash-1.4.2-1_2c0f5a1.noarch.rpm
     pkg_file_name = pkg_url.split('/')[-1]
-    pkg_file_path = os.path.join(DEFAULT_PATH, pkg_file_name)
+    # pkg_file_name = logstash-1.4.2-1_2c0f5a1.noarch.rpm
+    # consider using mkdtemp
+    pkg_file_path = os.path.join('/tmp', pkg_file_name)
+    # pkg_file_path = /tmp/logstash-1.4.2-1_2c0f5a1.noarch.rpm
     pkg_ext = os.path.splitext(pkg_file_name)
-    utils.download_resource(pkg_url, pkg_file_path)
+    # pkg_ext = rpm
+    pkg_destination = utils.download_resource(pkg_url, pkg_file_path)
     if pkg_ext in ('rpm', 'deb'):
-        install_from_package(pkg_file_path)
+        install_from_package(pkg_destination, pkg_ext)
     elif pkg_ext == 'tar.gz':
         install_from_tar()
-    os.remove(pkg_file_path)
+    os.remove(pkg_destination)
 
 
 def apply_rabbit_broker(file_path):
@@ -75,21 +84,22 @@ def apply_rabbit_broker(file_path):
     try:
         jingen.generate()
     except:
-        ctx.logger.info(
-            'template could not be generated. Assuming no template.')
+        ctx.logger.debug(
+            'Template could not be generated. Assuming no template.')
 
 
 @operation
 def configure(config_source,
-              config_destination=DEFAULT_CONFIG_DESTINATION_PATH, **kwargs):
+              config_destination=DEFAULT_CONFIG_DESTINATION_PATH, **_):
     """configures logstash by retrieving its config file"""
     utils.mkdir(os.path.dirname(config_destination))
-    utils.download_resource(config_source, config_destination)
-    apply_rabbit_broker(config_destination)
+    config_path = utils.download_resource(config_source, config_destination)
+    apply_rabbit_broker(config_path)
+    # CONFIGURE LOGSTASH TO READ THIS CONFIG FILE!
 
 
 @operation
-def start(**kwargs):
+def start(**_):
     """starts the process"""
     utils.sudo('service logstash start')
     # logstash_path = logstash_config.get('logstash_path', DEFAULT_PATH)

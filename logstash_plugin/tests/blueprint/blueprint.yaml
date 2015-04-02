@@ -1,24 +1,26 @@
-tosca_definitions_version: cloudify_dsl_1_0
+tosca_definitions_version: cloudify_dsl_1_1
 
 plugins:
-    script:
-        executor: central_deployment_agent
-        install: false
+  logstash:
+    executor: central_deployment_agent
+    install: false
 
 node_types: { type: {} }
 
 node_templates:
-    test:
-        type: type
-        interfaces:
-            test:
-                install:
-                    implementation: logstash.logstash_plugin.tasks.install
-                    inputs:
-                        java_path: /usr/bin/java
-                        package_source: https://download.elasticsearch.org/logstash/logstash/packages/debian/logstash_1.4.2-1-2c0f5a1_all.deb
-                config:
-                    implementation: logstash.logstash_plugin.tasks.configure
-                    inputs:
-                        config_source: resources/logstash.conf
-                        config_destination: ~/logstash/logstash.conf
+  test:
+    type: type
+    interfaces:
+      test:
+        install:
+          implementation: logstash.logstash_plugin.tasks.install
+          inputs:
+            java_path: /usr/bin/java
+            package_source: https://download.elasticsearch.org/logstash/logstash/packages/debian/logstash_1.4.2-1-2c0f5a1_all.deb
+        config:
+          implementation: logstash.logstash_plugin.tasks.configure
+          inputs:
+            config_source: resources/logstash.conf
+            config_destination: ~/logstash/logstash.conf
+        start: logstash.logstash_plugin.tasks.start
+        stop: logstash.logstash_plugin.tasks.stop
