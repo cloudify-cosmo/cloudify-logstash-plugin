@@ -68,8 +68,10 @@ def install(java_path='java', package_source=None, **_):
     pkg_destination = utils.download_resource(pkg_url, pkg_file_path)
     if pkg_ext in ('rpm', 'deb'):
         install_from_package(pkg_destination, pkg_ext)
+        ctx.instance.runtime_properties['from_package'] = True
     elif pkg_ext == 'tar.gz':
         install_from_tar()
+        ctx.instance.runtime_properties['from_package'] = False
     os.remove(pkg_destination)
 
 
@@ -91,11 +93,18 @@ def apply_rabbit_broker(file_path):
 @operation
 def configure(config_source,
               config_destination=DEFAULT_CONFIG_DESTINATION_PATH, **_):
-    """configures logstash by retrieving its config file"""
-    utils.mkdir(os.path.dirname(config_destination))
+    """Configures logstash by retrieving its config file and injecting
+    the Manager's IP to logstash.conf.
+    """
+    if ctx.instance.runtime_properties['from_package']:
+        config_destination = '/logstash/conf.d/logstash.conf'
+        ctx.logger.debug('Since we are installing using a package, the '
+                         'default configuration path will be used: {0}'.format(
+                             config_destination))
+    else:
+        utils.mkdir(os.path.dirname(config_destination))
     config_path = utils.download_resource(config_source, config_destination)
     apply_rabbit_broker(config_path)
-    # CONFIGURE LOGSTASH TO READ THIS CONFIG FILE!
 
 
 @operation
