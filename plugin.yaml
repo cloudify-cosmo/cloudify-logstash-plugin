@@ -1,0 +1,62 @@
+##################################################################################
+# Cloudify Logstash Plugin.
+##################################################################################
+
+imports:
+  - http://www.getcloudify.org/spec/fabric-plugin/1.2m8/plugin.yaml
+
+plugins:
+  logstash:
+    executor: host_agent
+    source: https://github.com/EarthmanT/cloudify-logstash-plugin/archive/master.zip
+
+node_types:
+
+  nodecellar.nodes.Logstash:
+    derived_from: cloudify.nodes.ApplicationServer
+    properties:
+      package_source:
+        type: string
+        description: >
+          A URL to an rpm or .deb file that you will use to install the logstash service.
+      config_source:
+        default: ''
+        description: >
+          A file in the blueprint directory that contains the Logstash config.
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          implementation: fabric.fabric_plugin.tasks.run_task
+          inputs:
+            tasks_file:
+              default: logstash_plugin/tasks.py
+            task_name:
+              default: install
+            task_properties:
+              default:
+                java_path: java
+                package_source: { get_property: [ SELF, package_source ] }
+        configure:
+          implementation: fabric.fabric_plugin.tasks.run_task
+          inputs:
+            tasks_file:
+              default: logstash_plugin/tasks.py
+            task_name:
+              default: configure
+            task_properties:
+              default:
+                config_source: { get_property: [ SELF, config_source ] }
+        start:
+          implementation: fabric.fabric_plugin.tasks.run_task
+          inputs:
+            tasks_file:
+              default: logstash_plugin/tasks.py
+            task_name:
+              default: start
+        stop:
+          implementation: fabric.fabric_plugin.tasks.run_task
+          inputs:
+            tasks_file:
+              default: logstash_plugin/tasks.py
+            task_name:
+              default: stop
