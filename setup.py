@@ -35,9 +35,8 @@ setup(
     zip_safe=False,
     install_requires=[
         # Necessary dependency for developing plugins, do not remove!
-        "cloudify-plugins-common==3.1a5",
-        "requests==2.4.1",
-        "jingen=0.1.0"
+        "cloudify-plugins-common==3.2a8",
+        "requests==2.4.1"
     ],
     test_requires=[
         "cloudify-dsl-parser==3.1a5"

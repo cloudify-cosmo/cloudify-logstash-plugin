@@ -5,7 +5,7 @@
 plugins:
   logstash:
     executor: central_deployment_agent
-    source: https://github.com/cloudify-cosmo/cloudify-logstash-plugin/archive/1.2.zip
+    source: https://github.com/EarthmanT/cloudify-logstash-plugin/archive/master.zip
 
 node_types:
 
@@ -23,27 +23,17 @@ node_types:
     interfaces:
       cloudify.interfaces.lifecycle:
         create:
-          implementation: fabric.fabric_plugin.tasks.run_task
+          implementation: logstash.logstash_plugin.tasks.install
           inputs:
-            tasks_file: logstash_plugin/tasks.py
-            task_name: install
-            task_properties:
+            default:
               java_path: java
               package_source: { get_property: [ SELF, package_source ] }
         configure:
-          implementation: fabric.fabric_plugin.tasks.run_task
+          implementation: logstash.logstash_plugin.tasks.configure
           inputs:
-            tasks_file: logstash_plugin/tasks.py
-            task_name: configure
-            task_properties:
+            default:
               config_source: { get_property: [ SELF, config_source ] }
         start:
-          implementation: fabric.fabric_plugin.tasks.run_task
-          inputs:
-            tasks_file: logstash_plugin/tasks.py
-            task_name: start
+          implementation: logstash.logstash_plugin.tasks.start
         stop:
-          implementation: fabric.fabric_plugin.tasks.run_task
-          inputs:
-            tasks_file: logstash_plugin/tasks.py
-            task_name: stop
+          implementation: logstash.logstash_plugin.tasks.stop
