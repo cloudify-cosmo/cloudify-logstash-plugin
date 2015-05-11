@@ -14,92 +14,115 @@
 #    * limitations under the License.
 
 # Built in Imports
-import os
-import tempfile
-
-# Third party Imports
-from fabric.api import run, put
+import subprocess
 
 # Cloudify Imports
-import utils
 from cloudify import ctx
+from cloudify.decorators import operation
 from cloudify import exceptions
 from constants import (
-    DEFAULT_LOGSTASH_CONFIG_DIRECTORY,
-    DEFAULT_CONFIG_FILE_PATH,
-    DEFAULT_PACKAGES
-    )
+    WHICH_YUM,
+    WHICH_APT,
+    YUM_RPM_URL,
+    YUM_REPO_PATH,
+    YUM_REPO_CONTENT,
+    APT_KEY_URL,
+    APT_DEB_STR
+)
 
 
-def install(java_path='java', package_source=None, **_):
-    """installs logstash
+@operation
+def start(command, **_):
+    """starts logstash daemon"""
 
-    This will check whether java is executable and then install logstash
+    ctx.logger.info('Attempting to start log transport service.')
 
-    Properties:
-    java_path - the path java can be found in.
-    logstash_source - the url from which to download the logstash package file
-    """
+    output = _run(command)
 
-    if not utils.verify_is_executable(java_path + ' -version'):
+    if output != 0:
         raise exceptions.NonRecoverableError(
-            '{0} is not executable.'.format(java_path))
+            'Unable to start log transport service: {0}'.format(output))
 
-    ctx.logger.debug('Attempting to install Logstash.')
 
-    pkg_url = package_source if package_source \
-        else DEFAULT_PACKAGES[utils.get_package_type_for_distro()]
+@operation
+def stop(command, **_):
+    """stops logstash daemon"""
 
-    pkg_file_name = pkg_url.split('/')[-1]
-    pkg_ext = os.path.splitext(pkg_file_name)
+    ctx.logger.info('Attempting to stop log transport service.')
 
-    if pkg_ext in ('deb'):
-        output = run('wget -q -O- {0} | dpkg --install - '.format(pkg_url))
-    elif pkg_ext in ('rpm'):
-        output = run('curl -sSL {0} | rpm -ivh - '.format(pkg_url))
+    output = _run(command)
+
+    if output != 0:
+        raise exceptions.NonRecoverableError(
+            'Unable to stop log transport service: {0}'.format(output))
+
+
+@operation
+def install(service, **_):
+    """ Installs Logstash """
+
+    ctx.logger.info('Attempting to install log transport service.')
+
+    _install_log_stash()
+
+
+def _install_log_stash():
+
+    if _run(WHICH_YUM) == 0:
+        _install_on_centos()
+    elif _run(WHICH_APT) == 0:
+        _install_on_ubuntu()
     else:
         raise exceptions.NonRecoverableError(
-            'Unsupported package_source. '
-            'Only deb and rpm supported at this time.')
+            'Unable to install, because host is '
+            'neither a Ubuntu, nor a CentOS host.')
 
-    if output and getattr(output, 'return_code') != 0:
+
+def _install_on_centos():
+
+    ctx.logger.info(
+        'Host is a CentOS host. Installing Logstash via yum.')
+
+    _run('rpm --import {0}'.format(YUM_RPM_URL))
+    _run('sudo cat > {0} <<-EOM '
+         '{1} EOM'.format(YUM_REPO_PATH, YUM_REPO_CONTENT))
+    _run('sudo yum -y install logstash')
+
+
+def _install_on_ubuntu():
+
+    ctx.logger.info(
+        'Host is an Ubuntu host. Installing Logstash via apt.')
+
+    _run('wget -qO - {0} | sudo apt-key add -'.format(APT_KEY_URL))
+    _run('echo "deb {0}" | '
+         'sudo tee -a /etc/apt/sources.list'.format(APT_DEB_STR))
+    _run('sudo apt-get update')
+    _run('sudo apt-get -y install logstash')
+
+
+def _run(command):
+
+    command_as_list = command.split()
+
+    ctx.logger.info('Running: {0}.'.format(command))
+    ctx.logger.info('Sending: {0}.'.format(command_as_list))
+
+    try:
+        p = subprocess.Popen(
+            command_as_list, stdout=subprocess.PIPE, shell=True)
+    except Exception as e:
         raise exceptions.NonRecoverableError(
-            'Unable to install Logstash: {0}'.format(output))
+            'Failed: {0}.'.format(str(e)))
 
-    ctx.logger.info('Installed Logstash.')
-
-
-def configure(config_source, **_):
-    """ Copies the provided config file to the config path on the host."""
-
-    mkdirs = \
-        'if [ ! -d {0} ]; then mkdir -p {0}; fi'.format(
-            DEFAULT_LOGSTASH_CONFIG_DIRECTORY)
-
-    downloaded_file = utils.download_resource(config_source, tempfile.mktemp())
-    output = run(mkdirs)
-
-    if getattr(output, 'return_code') != 0:
+    try:
+        out, err = p.communicate()
+    except Exception as e:
         raise exceptions.NonRecoverableError(
-            'Unable to copy configuration to server" {0}'.format(output))
+            'Failed: {0}.'.format(str(e)))
+    finally:
+        ctx.logger.info(
+            'RAN: {0}. OUT: {1}. ERR: {2}. Code: {3}.'.format(
+                command, out, err, p.returncode))
 
-    ctx.logger.debug('Copying config to {0}'.format(DEFAULT_CONFIG_FILE_PATH))
-    put(downloaded_file, DEFAULT_CONFIG_FILE_PATH)
-
-
-def start(**_):
-    """starts logstash daemon"""
-    ctx.logger.debug('Attempting to start Logstash.')
-    output = run('sudo service logstash start')
-    if getattr(output, 'return_code') != 0:
-        raise exceptions.NonRecoverableError(
-            'Unable to start Logstash: {0}'.format(output))
-
-
-def stop(**_):
-    """stops logstash daemon"""
-    ctx.logger.debug('Attempting to stop Logstash.')
-    output = run('sudo service logstash stop')
-    if getattr(output, 'return_code') != 0:
-        raise exceptions.NonRecoverableError(
-            'Unable to stop Logstash: {0}'.format(output))
+    return p.returncode

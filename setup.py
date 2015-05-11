@@ -21,25 +21,18 @@ from setuptools import setup
 setup(
 
     # Do not use underscores in the plugin name.
-    name='ENTER-PLUGIN-NAME-HERE',
+    name='cloudify-logstash-plugin',
 
-    version='0.1',
-    author='ENTER-AUTHOR-HERE',
-    author_email='ENTER-AUTHOR-EMAIL-HERE',
-    description='ENTER-DESCRIPTION-HERE',
-
-    # This must correspond to the actual packages in the plugin.
-    packages=['plugin'],
-
+    version='1.2',
+    author='gigaspaces',
+    author_email='cosmo-admin@gigaspaces.com',
+    packages=['logstash_plugin'],
     license='LICENSE',
-    zip_safe=False,
     install_requires=[
-        # Necessary dependency for developing plugins, do not remove!
-        "cloudify-plugins-common==3.2a8",
-        "requests==2.4.1"
+        "cloudify-plugins-common==3.2"
     ],
     test_requires=[
-        "cloudify-dsl-parser==3.1a5"
+        "cloudify-dsl-parser==3.2"
         "nose"
     ]
 )
