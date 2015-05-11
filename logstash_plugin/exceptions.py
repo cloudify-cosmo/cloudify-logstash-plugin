@@ -1,2 +1,0 @@
-class LogstashError(Exception):
-    pass
