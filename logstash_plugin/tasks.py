@@ -58,7 +58,7 @@ def stop(command, **_):
 
 
 @operation
-def install(service, **_):
+def install(**_):
     """ Installs Logstash """
 
     ctx.logger.info('Attempting to install log transport service.')
@@ -84,9 +84,9 @@ def _install_on_centos():
         'Host is a CentOS host. Installing Logstash via yum.')
 
     _run('rpm --import {0}'.format(YUM_RPM_URL))
-    _run('sudo cat > {0} <<-EOM '
+    _run('sudo /bin/cat > {0} <<-EOM '
          '{1} EOM'.format(YUM_REPO_PATH, YUM_REPO_CONTENT))
-    _run('sudo yum -y install logstash')
+    _run('sudo /usr/bin/yum -y install logstash')
 
 
 def _install_on_ubuntu():
@@ -94,11 +94,11 @@ def _install_on_ubuntu():
     ctx.logger.info(
         'Host is an Ubuntu host. Installing Logstash via apt.')
 
-    _run('wget -qO - {0} | sudo apt-key add -'.format(APT_KEY_URL))
-    _run('echo "deb {0}" | '
-         'sudo tee -a /etc/apt/sources.list'.format(APT_DEB_STR))
-    _run('sudo apt-get update')
-    _run('sudo apt-get -y install logstash')
+    _run('/usr/bin/wget -qO - {0} | sudo apt-key add -'.format(APT_KEY_URL))
+    _run('/bin/echo "deb {0}" | '
+         'sudo /usr/bin/tee -a /etc/apt/sources.list'.format(APT_DEB_STR))
+    _run('sudo /usr/bin/apt-get update')
+    _run('sudo /usr/bin/apt-get -y install logstash')
 
 
 def _run(command):

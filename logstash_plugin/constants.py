@@ -12,8 +12,8 @@
 #    * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    * See the License for the specific language governing permissions and
 #    * limitations under the License.
-WHICH_YUM = 'which yum'
-WHICH_APT = 'which apt-get'
+WHICH_YUM = '/usr/bin/which yum'
+WHICH_APT = '/usr/bin/which apt-get'
 
 
 DEFAULT_LOGSTASH_CONFIG_DIRECTORY = '/etc/logstash/conf.d/'

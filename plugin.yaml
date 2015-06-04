@@ -16,5 +16,9 @@ node_types:
           implementation: logstash.logstash_plugin.tasks.install
         start:
           implementation: logstash.logstash_plugin.tasks.start
+          inputs:
+            command: sudo service logstash start
         stop:
           implementation: logstash.logstash_plugin.tasks.stop
+          inputs:
+            command: sudo service logstash stop
