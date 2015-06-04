@@ -12,21 +12,8 @@
 #    * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    * See the License for the specific language governing permissions and
 #    * limitations under the License.
-WHICH_YUM = 'which yum'
-WHICH_APT = 'which apt-get'
 
-
-DEFAULT_LOGSTASH_CONFIG_DIRECTORY = '/etc/logstash/conf.d/'
-YUM_RPM_URL = 'https://packages.elasticsearch.org/GPG-KEY-elasticsearch'
-YUM_REPO_PATH = '/etc/yum.repos.d/logstash.repo'
-YUM_REPO_CONTENT = """
-[logstash-1.4]
-name=Logstash repository for 1.4.x packages
-baseurl=http://packages.elasticsearch.org/logstash/1.4/centos
-gpgcheck=1
-gpgkey=http://packages.elasticsearch.org/GPG-KEY-elasticsearch
-enabled=1
-"""
-APT_KEY_URL = 'https://packages.elasticsearch.org/GPG-KEY-elasticsearch'
-APT_DEB_STR = \
-    'http://packages.elasticsearch.org/logstash/1.4/debian stable main'
+ELATIC_CO_BASE_URL = 'http://download.elastic.co/logstash/' \
+                     'logstash/packages/'
+DEFAULT_RPM_URL = 'centos/logstash-1.5.0-1.noarch.rpm'
+DEFAULT_DEB_URL = 'debian/logstash_1.5.0-1_all.deb'

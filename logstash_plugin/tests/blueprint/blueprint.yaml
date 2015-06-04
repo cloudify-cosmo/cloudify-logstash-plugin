@@ -1,26 +1,33 @@
 tosca_definitions_version: cloudify_dsl_1_1
 
 plugins:
+
   logstash:
     executor: central_deployment_agent
     install: false
 
-node_types: { type: {} }
-
 node_templates:
-  test:
-    type: type
-    interfaces:
-      test:
-        install:
-          implementation: logstash.logstash_plugin.tasks.install
-          inputs:
-            java_path: /usr/bin/java
-            package_source: https://download.elasticsearch.org/logstash/logstash/packages/debian/logstash_1.4.2-1-2c0f5a1_all.deb
-        config:
-          implementation: logstash.logstash_plugin.tasks.configure
-          inputs:
-            config_source: resources/logstash.conf
-            config_destination: ~/logstash/logstash.conf
-        start: logstash.logstash_plugin.tasks.start
-        stop: logstash.logstash_plugin.tasks.stop
+
+  host:
+    type: cloudify.nodes.Compute
+    properties:
+      install_agent: false
+
+  inline_config:
+    type: logstash.nodes.Service
+    properties:
+      static_conf: |
+        input { stdin { type => "stdin-type"}}
+        output { stdout { debug => true debug_format => "json"}}
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: host
+
+  file_config:
+    type: logstash.nodes.Service
+    properties:
+      static_conf: resources/logstash.conf
+      conf_path: /etc/logstash/conf.d/logstash.conf
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: host

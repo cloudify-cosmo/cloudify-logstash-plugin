@@ -16,8 +16,53 @@
 
 import os
 import unittest
+import subprocess
 
 from cloudify.workflows import local
+
+DEFAULT = """
+input { stdin { type => "stdin-type"}}
+output { stdout { debug => true debug_format => "json"}}
+"""
+
+LOGSTASH = """
+inputs {
+    generator {
+        tags => ["event"]
+        count => 0
+        message => "Test Event Message"
+    }
+    generator {
+        tags => ["log"]
+        count => 0
+        message => "Test Log Message"
+    }
+}
+
+outputs {
+    rabbitmq {
+        if "event" in [tags] {
+            exchange => ""
+            exchange_type => "direct"
+            key => "cloudify-events"
+            host => "MGMT_IP"
+            durable => "true"
+            exclusive => "false"
+        }
+    }
+    rabbitmq {
+        if "log" in [tags] {
+            exchange => ""
+            exchange_type => "direct"
+            key => "cloudify-logs"
+            host => "MGMT_IP"
+            durable => "true"
+            exclusive => "false"
+        }
+    }
+    stdout {}
+}
+"""
 
 
 class TestPlugin(unittest.TestCase):
@@ -28,27 +73,33 @@ class TestPlugin(unittest.TestCase):
                                       'blueprint', 'blueprint.yaml')
 
         # inject input from test
-        inputs = {
-            'test_input': 'new_test_input'
-        }
+        inputs = {}
 
         # setup local workflow execution environment
         self.env = local.init_env(blueprint_path,
                                   name=self._testMethodName,
                                   inputs=inputs)
 
-    def test_my_task(self):
+    def test_install(self):
 
         # execute install workflow
-        self.env.execute('install', task_retries=0)
+        self.env.execute('install', task_retries=10)
 
-        # extract single node instance
-        instance = self.env.storage.get_node_instances()[0]
+        logstash_started = subprocess.call(
+            "sudo service logstash status", shell=True)
 
-        # assert runtime properties is properly set in node instance
-        self.assertEqual(instance.runtime_properties['value_of_some_property'],
-                         'new_test_input')
+        self.assertIn('started', logstash_started)
 
-        # assert deployment outputs are ok
-        self.assertDictEqual(self.env.outputs(),
-                             {'test_output': 'new_test_input'})
+        with open('/etc/logstash/conf.d/default', 'r') as default:
+            self.assertEqual(default.read(), DEFAULT)
+
+        with open('/etc/logstash/conf.d/logstash.conf', 'r') as logstash:
+            self.assertEqual(logstash.read(), LOGSTASH)
+
+    def test_uninstall(self):
+        # execute install workflow
+        self.env.execute('uninstall', task_retries=10)
+
+        logstash_stopped = subprocess.call(
+            "sudo service logstash status", shell=True)
+        self.assertNotIn('started', logstash_stopped)

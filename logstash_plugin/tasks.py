@@ -14,32 +14,100 @@
 #    * limitations under the License.
 
 # Built in Imports
-import subprocess
+import requests
+import platform
+import tempfile
+
+# Third party imports
+from jingen import Jingen
 
 # Cloudify Imports
+from utils import run
 from cloudify import ctx
-from cloudify.decorators import operation
 from cloudify import exceptions
+from cloudify.decorators import operation
 from constants import (
-    WHICH_YUM,
-    WHICH_APT,
-    YUM_RPM_URL,
-    YUM_REPO_PATH,
-    YUM_REPO_CONTENT,
-    APT_KEY_URL,
-    APT_DEB_STR
+    ELATIC_CO_BASE_URL,
+    DEFAULT_DEB_URL,
+    DEFAULT_RPM_URL,
+    INSTALLED_UBUNTU,
+    INSTALLED_CENTOS
 )
+
+
+@operation
+def configure(conf, **_):
+    """ Configure Logstash """
+
+    if 'template' in conf['type']:
+        if not conf.get('path'):
+            raise exceptions.NonRecoverableError(
+                'logstash property conf.path '
+                'cannot be empty if conf.type is "template".')
+        static_config = generate_static_config(conf.get('path'))
+    elif 'static' in conf['type']:
+        if not conf.get('path') and not conf.get('inline'):
+            raise exceptions.NonRecoverableError(
+                'either logstash property conf.path '
+                'or conf.inline are required when conf.type is "static".')
+        static_config = conf.get('path')
+    else:
+        raise exceptions.NonRecoverableError(
+            'logstash property conf.type '
+            'can only be "template" or "static".')
+
+    upload_static_config(static_config, conf.get('destination_path'))
+
+
+def generate_static_config(template_conf):
+
+    ctx.logger.info('Generating static conf from temlate')
+
+    package_file = tempfile.mktemp()
+
+    vars_source = {
+        'ctx': {
+            'node': ctx.node,
+            'instance': ctx.instance
+        }
+    }
+
+    i = Jingen(
+        template_file=template_conf,
+        vars_source=vars_source,
+        output_file=package_file,
+        # template_dir=template_dir,
+        make_file=True)
+    i.generate()
+
+    return package_file
+
+
+def upload_static_config(static_conf, conf_path):
+    """ Upload the static config to the service. """
+
+    ctx.logger.info('Copying config to {0}'.format(conf_path))
+
+    try:
+        downloaded_file = \
+            ctx.download_resource(static_conf, tempfile.mktemp())
+    except Exception as e:
+        raise exceptions.NonRecoverableError(
+            'conf.file was not found on manager. '
+            'Error: {0}.'.format(str(e)))
+
+    run('sudo cp {0} {1}'.format(downloaded_file, conf_path))
 
 
 @operation
 def start(command, **_):
     """starts logstash daemon"""
 
-    ctx.logger.info('Attempting to start log transport service.')
+    ctx.logger.debug('Attempting to start log transport service.')
 
-    output = _run(command)
+    output = run(command)
 
-    if output != 0:
+    if output.returncode != 0:
         raise exceptions.NonRecoverableError(
             'Unable to start log transport service: {0}'.format(output))
 
@@ -48,81 +116,61 @@ def start(command, **_):
 def stop(command, **_):
     """stops logstash daemon"""
 
-    ctx.logger.info('Attempting to stop log transport service.')
+    ctx.logger.debug('Attempting to stop log transport service.')
 
-    output = _run(command)
+    output = run(command)
 
-    if output != 0:
+    if output.returncode != 0:
         raise exceptions.NonRecoverableError(
             'Unable to stop log transport service: {0}'.format(output))
 
 
 @operation
-def install(**_):
+def install(package_url, **_):
     """ Installs Logstash """
 
-    ctx.logger.info('Attempting to install log transport service.')
+    ctx.logger.debug('Attempting to install log transport service.')
 
-    _install_log_stash()
+    _install(platform.dist(), package_url)
 
 
-def _install_log_stash():
+def _install(platform, url):
+    """ installs logstash from package """
 
-    if _run(WHICH_YUM) == 0:
-        _install_on_centos()
-    elif _run(WHICH_APT) == 0:
-        _install_on_ubuntu()
+    package_file = tempfile.mktemp()
+
+    if not url:
+        if 'Ubuntu' in platform:
+            url = ELATIC_CO_BASE_URL \
+                + DEFAULT_DEB_URL
+            if 'install' in run(INSTALLED_UBUNTU):
+                ctx.logger.info('Logstash already installed.')
+                return
+            install_command = 'sudo dpkg -i {0}'.format(package_file)
+        elif 'Centos' in platform:
+            url = ELATIC_CO_BASE_URL \
+                + DEFAULT_RPM_URL
+            if 'not installed' not in run(INSTALLED_CENTOS):
+                ctx.logger.info('Logstash already installed.')
+                return
+            install_command = 'sudo rpm -Uvh {0}'.format(package_file)
     else:
         raise exceptions.NonRecoverableError(
-            'Unable to install, because host is '
-            'neither a Ubuntu, nor a CentOS host.')
+            'Only Centos and Ubuntu supported.')
+
+    _download_package(package_file, url)
+
+    run(install_command)
 
 
-def _install_on_centos():
+def _download_package(package_file, url):
+    """ Downloads package from url to tempfile """
 
-    ctx.logger.info(
-        'Host is a CentOS host. Installing Logstash via yum.')
+    ctx.logger.debug('Downloading: {0}'.format(url))
+    package = requests.get(url, stream=True)
 
-    _run('rpm --import {0}'.format(YUM_RPM_URL))
-    _run('sudo cat > {0} <<-EOM '
-         '{1} EOM'.format(YUM_REPO_PATH, YUM_REPO_CONTENT))
-    _run('sudo yum -y install logstash')
-
-
-def _install_on_ubuntu():
-
-    ctx.logger.info(
-        'Host is an Ubuntu host. Installing Logstash via apt.')
-
-    _run('wget -qO - {0} | sudo apt-key add -'.format(APT_KEY_URL))
-    _run('echo "deb {0}" | '
-         'sudo tee -a /etc/apt/sources.list'.format(APT_DEB_STR))
-    _run('sudo apt-get update')
-    _run('sudo apt-get -y install logstash')
-
-
-def _run(command):
-
-    command_as_list = command.split()
-
-    ctx.logger.info('Running: {0}.'.format(command))
-    ctx.logger.info('Sending: {0}.'.format(command_as_list))
-
-    try:
-        p = subprocess.Popen(
-            command_as_list, stdout=subprocess.PIPE, shell=True)
-    except Exception as e:
-        raise exceptions.NonRecoverableError(
-            'Failed: {0}.'.format(str(e)))
-
-    try:
-        out, err = p.communicate()
-    except Exception as e:
-        raise exceptions.NonRecoverableError(
-            'Failed: {0}.'.format(str(e)))
-    finally:
-        ctx.logger.info(
-            'RAN: {0}. OUT: {1}. ERR: {2}. Code: {3}.'.format(
-                command, out, err, p.returncode))
-
-    return p.returncode
+    with open(package_file, 'wb') as f:
+        for chunk in package.iter_content(chunk_size=1024):
+            if chunk:
+                f.write(chunk)
+                f.flush()
