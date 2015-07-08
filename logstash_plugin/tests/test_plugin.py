@@ -40,10 +40,12 @@ class TestLogstashPlugin(LogstashTestUtils):
         with open(DEFAULT_LOGSTASH_CONFIG_PATH, 'r') as default:
             self.assertEqual(default.read(), self.get_config())
 
-    def test_uninstall(self):
+    def test_uninstall_static_clean(self):
         self.addCleanup(subprocess.call, DEFAULT_UBUNTU_UNINSTALL)
         self.addCleanup(subprocess.call, DEFAULT_LOGSTASH_STOP)
         self.addCleanup(os.remove, DEFAULT_LOGSTASH_CONFIG_PATH)
+        inputs = self.get_static_config_inputs()
+        self._set_up(inputs)
         self.env.execute('install', task_retries=10)
         self.env.execute('uninstall', task_retries=10)
         logstash_stopped = subprocess.call(
