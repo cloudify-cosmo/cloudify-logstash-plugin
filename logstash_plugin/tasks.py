@@ -58,9 +58,9 @@ def configure(conf, **_):
 
 def generate_static_config(template_conf):
 
-    ctx.logger.info('Generating static conf from temlate')
+    ctx.logger.info('Generating static conf from template')
 
-    raise NotImplemented
+    raise NotImplementedError
 
 
 def upload_static_config(static_conf, conf_path):
