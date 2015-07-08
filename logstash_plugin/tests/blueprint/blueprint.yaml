@@ -1,5 +1,9 @@
 tosca_definitions_version: cloudify_dsl_1_1
 
+imports:
+  - http://www.getcloudify.org/spec/cloudify/3.2/types.yaml
+  - https://raw.githubusercontent.com/EarthmanT/cloudify-logstash-plugin/master/plugin.yaml
+
 inputs:
 
   conf_type:
@@ -20,11 +24,10 @@ inputs:
       A static config can also be included inline here.
     default: ''
 
-plugins:
-
-  logstash:
-    executor: central_deployment_agent
-    install: false
+# plugins:
+#   logstash:
+#     executor: central_deployment_agent
+#     install: false
 
 node_templates:
 

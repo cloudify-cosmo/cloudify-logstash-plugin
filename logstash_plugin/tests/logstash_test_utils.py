@@ -19,6 +19,7 @@ import testtools
 
 # Cloudify Imports
 from cloudify.workflows import local
+from cloudify.mocks import MockCloudifyContext
 
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__),
                                    'blueprint/resources',
@@ -42,7 +43,6 @@ class LogstashTestUtils(testtools.TestCase):
     def setUp(self):
 
         super(LogstashTestUtils, self).setUp()
-        self._set_up()
 
     def tearDown(self):
 
@@ -98,3 +98,28 @@ class LogstashTestUtils(testtools.TestCase):
 
         with open(conf, 'r') as f:
             return f.read()
+
+    def get_mock_context(self, test_name):
+        """ Creates a mock context """
+
+        test_node_id = test_name
+        test_properties = {
+            'conf': {
+                'type': '',
+                'path': '',
+                'destination_path': '',
+                'inline': ''
+            }
+        }
+
+        operation = {
+            'retry_number': 0
+        }
+
+        ctx = MockCloudifyContext(
+            node_id=test_node_id,
+            properties=test_properties,
+            operation=operation
+        )
+
+        return ctx

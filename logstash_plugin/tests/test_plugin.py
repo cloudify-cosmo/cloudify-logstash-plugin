@@ -27,6 +27,10 @@ from logstash_test_utils import (
 
 class TestLogstashPlugin(LogstashTestUtils):
 
+    def SetUp(self):
+        super(LogstashTestUtils, self).setUp()
+        self._set_up()
+
     def test_install_static_clean(self):
         inputs = self.get_static_config_inputs()
         self._set_up(inputs)
