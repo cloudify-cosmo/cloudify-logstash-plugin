@@ -18,9 +18,6 @@ import requests
 import platform
 import tempfile
 
-# Third party imports
-from jingen import Jingen
-
 # Cloudify Imports
 from utils import run
 from cloudify import ctx
@@ -63,24 +60,7 @@ def generate_static_config(template_conf):
 
     ctx.logger.info('Generating static conf from temlate')
 
-    package_file = tempfile.mktemp()
-
-    vars_source = {
-        'ctx': {
-            'node': ctx.node,
-            'instance': ctx.instance
-        }
-    }
-
-    i = Jingen(
-        template_file=template_conf,
-        vars_source=vars_source,
-        output_file=package_file,
-        # template_dir=template_dir,
-        make_file=True)
-    i.generate()
-
-    return package_file
+    raise NotImplemented
 
 
 def upload_static_config(static_conf, conf_path):

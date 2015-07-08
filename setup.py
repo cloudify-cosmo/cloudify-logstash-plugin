@@ -29,8 +29,7 @@ setup(
     packages=['logstash_plugin'],
     license='LICENSE',
     install_requires=[
-        "cloudify-plugins-common==3.2",
-        "jingen"
+        "cloudify-plugins-common==3.2"
     ],
     test_requires=[
         "cloudify-dsl-parser==3.2"
