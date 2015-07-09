@@ -35,7 +35,7 @@ class TestLogstashPlugin(LogstashTestUtils):
         inputs = self.get_static_config_inputs()
         self._set_up(inputs)
         self.addCleanup(subprocess.call, DEFAULT_UBUNTU_UNINSTALL)
-        self.env.execute('install', task_retries=10)
+        self.localenv.execute('install', task_retries=10)
         self.addCleanup(subprocess.call, DEFAULT_LOGSTASH_STOP)
         logstash_started = subprocess.call(
             "sudo service logstash status", shell=True)
@@ -50,8 +50,8 @@ class TestLogstashPlugin(LogstashTestUtils):
         self.addCleanup(os.remove, DEFAULT_LOGSTASH_CONFIG_PATH)
         inputs = self.get_static_config_inputs()
         self._set_up(inputs)
-        self.env.execute('install', task_retries=10)
-        self.env.execute('uninstall', task_retries=10)
+        self.localenv.execute('install', task_retries=10)
+        self.localenv.execute('uninstall', task_retries=10)
         logstash_stopped = subprocess.call(
             "sudo service logstash status", shell=True)
         self.assertNotIn('started', logstash_stopped)
