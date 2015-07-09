@@ -23,16 +23,12 @@ setup(
     # Do not use underscores in the plugin name.
     name='cloudify-logstash-plugin',
 
-    version='1.3',
+    version='1.3a3',
     author='gigaspaces',
     author_email='cosmo-admin@gigaspaces.com',
     packages=['logstash_plugin'],
     license='LICENSE',
     install_requires=[
-        "cloudify-plugins-common==3.2"
-    ],
-    test_requires=[
-        "cloudify-dsl-parser==3.2"
-        "nose"
+        "cloudify-plugins-common==3.3a3"
     ]
 )
