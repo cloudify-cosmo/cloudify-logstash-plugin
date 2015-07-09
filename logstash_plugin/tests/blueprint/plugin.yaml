@@ -1,0 +1,56 @@
+##################################################################################
+# Cloudify Logstash Plugin.
+##################################################################################
+
+plugins:
+  logstash:
+    executor: central_deployment_agent
+    install: false
+
+node_types:
+
+  logstash.nodes.Service:
+    derived_from: cloudify.nodes.ApplicationServer
+    properties:
+      conf:
+        default:
+          type:
+            default: static
+            description: >
+              Required. Possible values: static or template.
+          path:
+            default: ''
+            description: >
+              The path to a static or template configuration file.
+          destination_path:
+            default: /etc/logstash/conf/logstash.conf
+            description: >
+              The full path where you want to save the file described in conf.
+          inline:
+            default: ''
+            description: >
+              An inline static configuration.
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          implementation: logstash.logstash_plugin.tasks.install
+          inputs:
+            package_url:
+              default: {}
+              description: >
+                Provide a URL to an RPM or a DEB file.
+        configure:
+          implementation: logstash.logstash_plugin.tasks.configure
+          inputs:
+            conf:
+              default: { get_property: [ SELF, conf ] }
+        start:
+          implementation: logstash.logstash_plugin.tasks.start
+          inputs:
+            command:
+              default: sudo service logstash start
+        stop:
+          implementation: logstash.logstash_plugin.tasks.stop
+          inputs:
+            command:
+              default: sudo service logstash stop
