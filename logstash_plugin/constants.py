@@ -12,3 +12,10 @@
 #    * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    * See the License for the specific language governing permissions and
 #    * limitations under the License.
+
+ELATIC_CO_BASE_URL = 'http://download.elastic.co/logstash/' \
+                     'logstash/packages/'
+DEFAULT_RPM_URL = 'centos/logstash-1.5.0-1.noarch.rpm'
+DEFAULT_DEB_URL = 'debian/logstash_1.5.0-1_all.deb'
+INSTALLED_UBUNTU = 'out=`dpkg --get-selections logstash`'
+INSTALLED_CENTOS = 'out=`rpm -qa logstash'

@@ -4,8 +4,8 @@
 
 plugins:
   logstash:
-    executor: central_deployment_agent
-    install: false
+    executor: host_agent
+    source: https://github.com/EarthmanT/cloudify-logstash-plugin/archive/master.zip
 
 node_types:
 
@@ -23,7 +23,7 @@ node_types:
             description: >
               The path to a static or template configuration file.
           destination_path:
-            default: /etc/logstash/conf/logstash.conf
+            default: /etc/logstash/conf.d/logstash.conf
             description: >
               The full path where you want to save the file described in conf.
           inline:

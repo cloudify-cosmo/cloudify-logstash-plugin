@@ -1,134 +1,44 @@
-import requests
-import tarfile
-import subprocess
-import os
-import platform
+########
+# Copyright (c) 2015 GigaSpaces Technologies Ltd. All rights reserved
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#        http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+#    * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#    * See the License for the specific language governing permissions and
+#    * limitations under the License.
 
+# Built in imports
+from subprocess import Popen, PIPE
+
+# Cloudify imports
 from cloudify import ctx
 from cloudify import exceptions
 
 
-def get_distro():
-    ctx.logger.debug('identifying distribution...')
-    distro = platform.dist()[0]
-    ctx.logger.debug('distro identified: {0}'.format(distro))
+def run(command):
 
+    command_as_list = command.split()
 
-def get_package_type_for_distro(distro=get_distro()):
-    ctx.logger.debug('identifying package type for distro')
-    if distro.lower() in ['ubuntu', 'debian']:
-        return 'deb'
-    elif distro.lower() in ['centos', 'redhat', 'fedora']:
-        return 'rpm'
-    else:
-        return None
-
-
-def install_package(path, ext, distro=get_distro()):
-    """installs an rpm/deb package
-
-    Distribution identification will happen automatically.
-    If the distribution is not supported, or the package
-    extension does not fit the identified distribution,
-    an exception will be raised.
-    """
-    ctx.logger.info('Attemping to install {0}'.format(path))
-    ctx.logger.debug('Package extention is: {0}'.format(ext))
-    package_type = get_package_type_for_distro(distro)
-    # check which package type we're expecting
-    if not package_type:
+    try:
+        run = Popen(command_as_list, stdout=PIPE)
+    except Exception as e:
         raise exceptions.NonRecoverableError(
-            'Unsupported distribution: {0}'.format(distro))
-    if not ext == package_type:
+            'Unable to run command. Error {0}'.format(str(e)))
+
+    try:
+        output = run.communicate()
+    except Exception as e:
         raise exceptions.NonRecoverableError(
-            'Package type for distro {0} cannot be of type {1}'.format(
-                distro, ext))
-    elif ext == 'deb':
-        return sudo('dpkg -i {0}'.format(path))
-    elif ext == 'rpm':
-        return sudo('rpm -ivh {0}'.format(path))
+            'Unable to run command. Error {0}'.format(str(e)))
+    finally:
+        ctx.logger.debug(
+            'RAN: {0}. OUT: {1}. Code: {2}.'.format(
+                command, output, run.returncode))
 
-
-def check_resource_available(resource):
-    ctx.logger.debug('verifying that {0} is available'.format(resource))
-    response = requests.head(resource)
-    if response.status_code != requests.codes.ok:
-        raise exceptions.NonRecoverableError(
-            "resource is not available (at {0})".format(resource))
-
-
-def untar(source, destination):
-    if not tarfile.is_tarfile(source):
-        raise exceptions.NonRecoverableError(
-            '{0} is not a tar file.'.format(source))
-    # with tarfile.open(source, 'r:gz') as tar:
-    #     tar.extractall(destination)
-
-    # after this logstash now available at ~/logstash/bin/logstash
-    run('tar -xzvf {0} -C {1} --strip-components=1'.format(
-        source, destination))
-
-
-def run(cmd):
-    """executes a command
-
-    :param string cmd: command to execute
-    """
-    p = subprocess.Popen(
-        cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    (stdout, stderr) = p.communicate()
-    ctx.logger.debug('stdout: {0}'.format(stdout))
-    ctx.logger.debug('stderr: {0}'.format(stderr))
-    p.stdout = stdout
-    p.strerr = stderr
-    return p
-
-
-def sudo(cmd):
-    return run('sudo {0}'.format(cmd))
-
-
-def mkdir(path):
-    if not os.path.isdir(os.path.dirname(path)):
-        ctx.logger.debug('Creating directory: {0}'.format(path))
-        try:
-            os.makedirs(os.path.dirname(path))
-        except Exception as ex:
-            raise exceptions.NonRecoverableError(
-                'Failed to create directory: {0}. ({1})'.format(
-                    path, ex.message))
-    else:
-        ctx.logger.debug('Directory already exists: {0}'.format(path))
-
-
-def verify_is_executable(execute):
-    ctx.logger.debug('Verifying that {0} is executable.'.format(execute))
-    if os.system('{0}'.format(execute)):
-        return False
-    return True
-
-
-def download_resource(url, destination):
-    ctx.logger.debug('downloading {0} to {1}...'.format(url, destination))
-    split = url.split('://')
-    schema = split[0]
-    if schema in ['http', 'https']:
-        response = requests.get(url, stream=True)
-        if not response.status_code == 200:
-            raise exceptions.NonRecoverableError(
-                'Failed downloading resource: {0}'
-                ' (''status code: {1})'.format(url, response.status_code))
-        with open(destination, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=1024):
-                if chunk:  # filter out keep-alive new chunks
-                    f.write(chunk)
-                    f.flush()
-        return destination
-    else:
-        return ctx.download_resource(url)
-
-
-# def download_resource(url, destination):
-#     prn('Downloading {0} to {1}'.format(url, destination))
-#     f = urllib.URLopener()
-#     f.retrieve(url, destination)
+    return run

@@ -1,5 +1,5 @@
 ########
-# Copyright (c) 2014 GigaSpaces Technologies Ltd. All rights reserved
+# Copyright (c) 2015 GigaSpaces Technologies Ltd. All rights reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,115 +13,144 @@
 #    * See the License for the specific language governing permissions and
 #    * limitations under the License.
 
+# Built in Imports
+import requests
+import platform
+import tempfile
 
-import os
-
-import utils
+# Cloudify Imports
+from utils import run
 from cloudify import ctx
-from cloudify.decorators import operation
-from jingen import Jingen
 from cloudify import exceptions
-
-
-DEFAULT_PATH = os.path.expanduser('~/logstash')
-DEFAULT_CONFIG_DESTINATION_PATH = os.path.join(DEFAULT_PATH, 'logstash.conf')
-DEFAULT_TAR_DESTINATION_PATH = os.path.join(DEFAULT_PATH, 'logstash.tar.gz')
-DEFAULT_PACKAGES = {
-    'tar': 'https://download.elasticsearch.org/logstash/logstash/logstash-1.4.2.tar.gz',  # NOQA
-    'rpm': 'https://download.elasticsearch.org/logstash/logstash/packages/centos/logstash-1.4.2-1_2c0f5a1.noarch.rpm',  # NOQA
-    'deb': 'https://download.elasticsearch.org/logstash/logstash/packages/debian/logstash_1.4.2-1-2c0f5a1_all.deb',  # NOQA
-}
-
-
-@operation
-def install(java_path='java', package_source=None, **_):
-    """installs logstash
-
-    This will check whether java is executable and then install logstash
-
-    Properties:
-    java_path - the path java can be found in.
-    logstash_source - the url from which to download the logstash package file
-    """
-    def install_from_tar():
-        """installs logstash from a tar.gz file"""
-        raise NotImplementedError()
-
-    def install_from_package(path):
-        """installs logstash from a deb/rpm package"""
-        utils.install_package(path)
-
-    if not utils.verify_is_executable(java_path + ' -version'):
-        # a better exception message.
-        raise exceptions.NonRecoverableError('{0} is not executable.'.format(
-            java_path))
-    pkg_url = package_source if package_source \
-        else DEFAULT_PACKAGES[utils.get_package_type_for_distro()]
-    # pkg_url = https://logstash-1.4.2-1_2c0f5a1.noarch.rpm
-    pkg_file_name = pkg_url.split('/')[-1]
-    # pkg_file_name = logstash-1.4.2-1_2c0f5a1.noarch.rpm
-    # consider using mkdtemp
-    pkg_file_path = os.path.join('/tmp', pkg_file_name)
-    # pkg_file_path = /tmp/logstash-1.4.2-1_2c0f5a1.noarch.rpm
-    pkg_ext = os.path.splitext(pkg_file_name)
-    # pkg_ext = rpm
-    pkg_destination = utils.download_resource(pkg_url, pkg_file_path)
-    if pkg_ext in ('rpm', 'deb'):
-        install_from_package(pkg_destination, pkg_ext)
-        ctx.instance.runtime_properties['from_package'] = True
-    elif pkg_ext == 'tar.gz':
-        install_from_tar()
-        ctx.instance.runtime_properties['from_package'] = False
-    os.remove(pkg_destination)
-
-
-def apply_rabbit_broker(file_path):
-    vars = {"MGMT_IP": ctx.get_management_ip()}
-    jingen = Jingen(
-        template_file=file_path,
-        vars_source=vars,
-        output_file=file_path,
-        template_dir=os.path.dirname(file_path),
-        make_file=True)
-    try:
-        jingen.generate()
-    except:
-        ctx.logger.debug(
-            'Template could not be generated. Assuming no template.')
+from cloudify.decorators import operation
+from constants import (
+    ELATIC_CO_BASE_URL,
+    DEFAULT_DEB_URL,
+    DEFAULT_RPM_URL,
+    INSTALLED_UBUNTU,
+    INSTALLED_CENTOS
+)
 
 
 @operation
-def configure(config_source,
-              config_destination=DEFAULT_CONFIG_DESTINATION_PATH, **_):
-    """Configures logstash by retrieving its config file and injecting
-    the Manager's IP to logstash.conf.
-    """
-    if ctx.instance.runtime_properties['from_package']:
-        config_destination = '/logstash/conf.d/logstash.conf'
-        ctx.logger.debug('Since we are installing using a package, the '
-                         'default configuration path will be used: {0}'.format(
-                             config_destination))
+def configure(conf, **_):
+    """ Configure Logstash """
+
+    if 'template' in conf.get('type'):
+        if not conf.get('path'):
+            raise exceptions.NonRecoverableError(
+                'logstash property conf.path '
+                'cannot be empty if conf.type is "template".')
+        static_config = generate_static_config(conf.get('path'))
+    elif 'static' in conf.get('type'):
+        if not conf.get('path') and not conf.get('inline'):
+            raise exceptions.NonRecoverableError(
+                'either logstash property conf.path '
+                'or conf.inline are required when conf.type is "static".')
+        static_config = conf.get('path')
     else:
-        utils.mkdir(os.path.dirname(config_destination))
-    config_path = utils.download_resource(config_source, config_destination)
-    apply_rabbit_broker(config_path)
+        raise exceptions.NonRecoverableError(
+            'logstash property conf.type '
+            'can only be "template" or "static".')
+
+    upload_static_config(static_config, conf.get('destination_path'))
+
+
+def generate_static_config(template_conf):
+
+    ctx.logger.info('Generating static conf from template')
+
+    raise NotImplementedError
+
+
+def upload_static_config(static_conf, conf_path):
+    """ Upload the static config to the service. """
+
+    ctx.logger.info('Copying config to {0}'.format(conf_path))
+
+    try:
+        downloaded_file = \
+            ctx.download_resource(static_conf, tempfile.mktemp())
+    except Exception as e:
+        raise exceptions.NonRecoverableError(
+            'failed to download. Error: {0}.'.format(str(e)))
+
+    run('sudo cp {0} {1}'.format(downloaded_file, conf_path))
 
 
 @operation
-def start(**_):
-    """starts the process"""
-    utils.sudo('service logstash start')
-    # logstash_path = logstash_config.get('logstash_path', DEFAULT_PATH)
-    # conf_dst = logstash_config.get(
-    #     'conf_destination', DEFAULT_CONFIG_DESTINATION_PATH)
-    # if logstash_config('java_path'):
-    #     os.environ['JAVA_HOME'] = logstash_config['java_path']
-    # logstash_binary = os.path.join(logstash_path, 'bin/logstash')
-    # cmd = 'nohup ' + logstash_binary + ' -f ' + conf_dst
-    # utils._run(cmd)
+def start(command, **_):
+    """starts logstash daemon"""
+
+    ctx.logger.debug('Attempting to start log transport service.')
+
+    output = run(command)
+
+    if output.returncode != 0:
+        raise exceptions.NonRecoverableError(
+            'Unable to start log transport service: {0}'.format(output))
 
 
 @operation
-def stop(**kwargs):
-    """stops the process"""
-    utils.sudo('service logstash stop')
+def stop(command, **_):
+    """stops logstash daemon"""
+
+    ctx.logger.debug('Attempting to stop log transport service.')
+
+    output = run(command)
+
+    if output.returncode != 0:
+        raise exceptions.NonRecoverableError(
+            'Unable to stop log transport service: {0}'.format(output))
+
+
+@operation
+def install(package_url, **_):
+    """ Installs Logstash """
+
+    ctx.logger.debug('Attempting to install log transport service.')
+    distro = platform.linux_distribution(full_distribution_name=False)
+    _install(distro.lower(), package_url)
+
+
+def _install(platform, url):
+    """ installs logstash from package """
+
+    _, package_file = tempfile.mkstemp()
+
+    if 'ubuntu' in platform:
+        install_command = 'sudo dpkg -i {0}'.format(package_file)
+        if 'install' in run(INSTALLED_UBUNTU):
+            ctx.logger.info('Logstash already installed.')
+            return
+        if not url:
+            url = ELATIC_CO_BASE_URL \
+                + DEFAULT_DEB_URL
+    elif 'centos' in platform:
+        install_command = 'sudo yum install -y {0}'.format(package_file)
+        if 'not installed' not in run(INSTALLED_CENTOS):
+            ctx.logger.info('Logstash already installed.')
+            return
+        if not url:
+            url = ELATIC_CO_BASE_URL \
+                + DEFAULT_RPM_URL
+    else:
+        raise exceptions.NonRecoverableError(
+            'Only Centos and Ubuntu supported.')
+
+    _download_package(package_file, url)
+
+    run(install_command)
+
+
+def _download_package(package_file, url):
+    """ Downloads package from url to tempfile """
+
+    ctx.logger.debug('Downloading: {0}'.format(url))
+    package = requests.get(url, stream=True)
+
+    with open(package_file, 'wb') as f:
+        for chunk in package.iter_content(chunk_size=1024):
+            if chunk:
+                f.write(chunk)
+                f.flush()
