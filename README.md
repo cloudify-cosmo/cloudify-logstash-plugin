@@ -7,4 +7,4 @@ cloudify-logstash-plugin
 
 ## Usage
 
-See [Logstash Plugin](http://getcloudify.org/guide/plugin-logstash.html)
+See [Logstash Plugin](http://getcloudify.org/guide/3.2/plugin-logstash.html)
