@@ -36,13 +36,13 @@ from constants import (
 def configure(conf, **_):
     """ Configure Logstash """
 
-    if 'template' in conf['type']:
+    if 'template' in conf.get('type'):
         if not conf.get('path'):
             raise exceptions.NonRecoverableError(
                 'logstash property conf.path '
                 'cannot be empty if conf.type is "template".')
         static_config = generate_static_config(conf.get('path'))
-    elif 'static' in conf['type']:
+    elif 'static' in conf.get('type'):
         if not conf.get('path') and not conf.get('inline'):
             raise exceptions.NonRecoverableError(
                 'either logstash property conf.path '
@@ -73,8 +73,7 @@ def upload_static_config(static_conf, conf_path):
             ctx.download_resource(static_conf, tempfile.mktemp())
     except Exception as e:
         raise exceptions.NonRecoverableError(
-            'conf.file was not found on manager. '
-            'Error: {0}.'.format(str(e)))
+            'failed to download. Error: {0}.'.format(str(e)))
 
     run('sudo cp {0} {1}'.format(downloaded_file, conf_path))
 
@@ -110,30 +109,31 @@ def install(package_url, **_):
     """ Installs Logstash """
 
     ctx.logger.debug('Attempting to install log transport service.')
-
-    _install(platform.dist(), package_url)
+    distro = platform.linux_distribution(full_distribution_name=False)
+    _install(distro.lower(), package_url)
 
 
 def _install(platform, url):
     """ installs logstash from package """
 
-    package_file = tempfile.mktemp()
+    _, package_file = tempfile.mkstemp()
 
-    if not url:
-        if 'Ubuntu' in platform:
+    if 'ubuntu' in platform:
+        install_command = 'sudo dpkg -i {0}'.format(package_file)
+        if 'install' in run(INSTALLED_UBUNTU):
+            ctx.logger.info('Logstash already installed.')
+            return
+        if not url:
             url = ELATIC_CO_BASE_URL \
                 + DEFAULT_DEB_URL
-            if 'install' in run(INSTALLED_UBUNTU):
-                ctx.logger.info('Logstash already installed.')
-                return
-            install_command = 'sudo dpkg -i {0}'.format(package_file)
-        elif 'Centos' in platform:
+    elif 'centos' in platform:
+        install_command = 'sudo yum install -y {0}'.format(package_file)
+        if 'not installed' not in run(INSTALLED_CENTOS):
+            ctx.logger.info('Logstash already installed.')
+            return
+        if not url:
             url = ELATIC_CO_BASE_URL \
                 + DEFAULT_RPM_URL
-            if 'not installed' not in run(INSTALLED_CENTOS):
-                ctx.logger.info('Logstash already installed.')
-                return
-            install_command = 'sudo rpm -Uvh {0}'.format(package_file)
     else:
         raise exceptions.NonRecoverableError(
             'Only Centos and Ubuntu supported.')
