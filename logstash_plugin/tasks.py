@@ -110,7 +110,8 @@ def install(package_url, **_):
 
     ctx.logger.debug('Attempting to install log transport service.')
     distro = platform.linux_distribution(full_distribution_name=False)
-    _install(distro.lower(), package_url)
+    distro = [li.lower() for li in distro]
+    _install(distro, package_url)
 
 
 def _install(platform, url):
