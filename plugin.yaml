@@ -5,7 +5,7 @@
 plugins:
   logstash:
     executor: host_agent
-    source: https://github.com/EarthmanT/cloudify-logstash-plugin/archive/master.zip
+    source: https://github.com/cloudify-cosmo/cloudify-logstash-plugin/archive/master.zip
 
 node_types:
 
